@@ -1,13 +1,10 @@
-from functions.get_files_info import get_files_info
+from functions.get_file_content import *
 
-print("Result for current directory:")
-print(get_files_info("calculator", "."))
-
-print("\nResult for 'pkg' directory:")
-print(get_files_info("calculator", "pkg"))
-
-print("\nResult for '/bin' directory:")
-print(get_files_info("calculator", "/bin"))
-
-print("\nResult for '../' directory:")
-print(get_files_info("calculator", "../"))
+print("Showing file content:")
+print(get_file_content("calculator", "main.py"))
+print("Showing file content:")
+print(get_file_content("calculator", "pkg/calculator.py"))
+print("Showing file content:")
+print(get_file_content("calculator", "/bin/cat"))
+print("Showing file content:")
+print(get_file_content("calculator", "pkg/does_not_exist.py"))
