@@ -3,25 +3,52 @@ import sys
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from functions.get_files_info import schema_get_files_info
 
+# list of available functions for LLM to use
+available_functions = types.Tool(
+    function_declarations=[
+        schema_get_files_info,
+    ]
+)
+
+# ai output message
 def generate_response(client, messages, verbose, user_prompt):
-    # ai output message
+    model_name = 'gemini-2.0-flash-001'
+    system_prompt = """
+        You are a helpful AI coding agent.
+
+        When a user asks a question or makes a request, make a function call plan. You can perform the following operations:
+
+        - List files and directories
+
+        All paths you provide should be relative to the working directory. You do not need to specify the working directory in your function calls as it is automatically injected for security reasons.
+        """
     response = client.models.generate_content(
-        model='gemini-2.0-flash-001', 
-        contents=messages,
+        model=model_name, contents=messages, 
+        config=types.GenerateContentConfig(tools=[available_functions], system_instruction=system_prompt),
     )
     
     # token count
     prompt_tokens = response.usage_metadata.prompt_token_count
     response_tokens = response.usage_metadata.candidates_token_count
 
-    if verbose:
-        print(response.text)
-        print(f"User prompt: {user_prompt}")
-        print(f"Prompt tokens: {prompt_tokens}")
-        print(f"Response tokens: {response_tokens}")
+    if response.function_calls:
+        for fc in response.function_calls:
+            print(f"Calling function: {fc.name}({fc.args})")
+        if verbose:
+            print(response.text)
+            print(f"User prompt: {user_prompt}")
+            print(f"Prompt tokens: {prompt_tokens}")
+            print(f"Response tokens: {response_tokens}")
     else:
-        print(response.text)
+        if verbose:
+            print(response.text)
+            print(f"User prompt: {user_prompt}")
+            print(f"Prompt tokens: {prompt_tokens}")
+            print(f"Response tokens: {response_tokens}")
+        else:
+            print(response.text)
 
 def main():
     # getting API key
