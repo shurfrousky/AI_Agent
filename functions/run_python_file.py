@@ -31,7 +31,7 @@ def run_python_file(working_directory, file_path, args=[]):
         return "No output produced."
     
     # formating for cleaner oputput and showing return code
-    output_parts = [f"STDOUT: {std_out.strip()}", f"STDERR: {std_error.strip()}"]
+    output_parts = [f"STDOUT:\n {std_out.strip()}", f"STDERR:\n {std_error.strip()}"]
     if result.returncode != 0:
         output_parts.append(f"Process exited with code {result.returncode}")
 

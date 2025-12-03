@@ -3,13 +3,16 @@ import sys
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from functions.get_files_info import schema_get_files_info
+from functions.get_files_info import schema_get_files_info, schema_get_file_content, schema_run_python_file, schema_write_file
 
 # list of available functions for LLM to use
 available_functions = types.Tool(
     function_declarations=[
         schema_get_files_info,
-    ]
+        schema_get_file_content,
+         schema_run_python_file,
+         schema_write_file
+     ]
 )
 
 # ai output message
@@ -21,6 +24,9 @@ def generate_response(client, messages, verbose, user_prompt):
         When a user asks a question or makes a request, make a function call plan. You can perform the following operations:
 
         - List files and directories
+        - Read file contents
+        - Execute Python files with optional arguments
+        - Write or overwrite files
 
         All paths you provide should be relative to the working directory. You do not need to specify the working directory in your function calls as it is automatically injected for security reasons.
         """
@@ -54,6 +60,9 @@ def main():
     # getting API key
     load_dotenv()
     api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY environment variable not set")
+    
     client = genai.Client(api_key=api_key)
     args = sys.argv[1:]
     verbose = False
