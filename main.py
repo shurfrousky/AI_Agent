@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from functions.get_files_info import schema_get_files_info, schema_get_file_content, schema_run_python_file, schema_write_file
+from call_function import call_function
 
 # list of available functions for LLM to use
 available_functions = types.Tool(
@@ -17,6 +18,7 @@ available_functions = types.Tool(
 
 # ai output message
 def generate_response(client, messages, verbose, user_prompt):
+    tool_responses = []
     model_name = 'gemini-2.0-flash-001'
     system_prompt = """
         You are a helpful AI coding agent.
@@ -41,7 +43,20 @@ def generate_response(client, messages, verbose, user_prompt):
 
     if response.function_calls:
         for fc in response.function_calls:
-            print(f"Calling function: {fc.name}({fc.args})")
+            function_call_result = call_function(fc, verbose=verbose)
+            parts = function_call_result.parts
+
+            if not parts or not getattr(parts[0], "function_response", None):
+                raise RuntimeError("Function call result missing function_response")
+            
+            func_response = parts[0].function_response.response
+            if func_response is None:
+                raise RuntimeError("Function call result missing report data")
+            
+            tool_responses.append(parts[0])
+            if verbose:
+                print(f"-> {func_response}")
+                
         if verbose:
             print(response.text)
             print(f"User prompt: {user_prompt}")
