@@ -11,15 +11,14 @@ available_functions = types.Tool(
     function_declarations=[
         schema_get_files_info,
         schema_get_file_content,
-         schema_run_python_file,
-         schema_write_file
+        schema_run_python_file,
+        schema_write_file
      ]
 )
 
 # ai output message
 def generate_response(client, messages, verbose, user_prompt):
-    tool_responses = []
-    model_name = 'gemini-2.0-flash-001'
+    model_name = 'gemini-2.5-flash'
     system_prompt = """
         You are a helpful AI coding agent.
 
@@ -34,13 +33,15 @@ def generate_response(client, messages, verbose, user_prompt):
         """
     response = client.models.generate_content(
         model=model_name, contents=messages, 
-        config=types.GenerateContentConfig(tools=[available_functions], system_instruction=system_prompt),
-    )
-    
-    # token count
-    prompt_tokens = response.usage_metadata.prompt_token_count
-    response_tokens = response.usage_metadata.candidates_token_count
+        config=types.GenerateContentConfig(tools=[available_functions], system_instruction=system_prompt),            
+        )
 
+    # adding additional replies to messages list
+    if response.candidates:
+        for candidate in response.candidates:
+            messages.append(candidate.content)
+        
+    tool_responses = []
     if response.function_calls:
         for fc in response.function_calls:
             function_call_result = call_function(fc, verbose=verbose)
@@ -48,28 +49,52 @@ def generate_response(client, messages, verbose, user_prompt):
 
             if not parts or not getattr(parts[0], "function_response", None):
                 raise RuntimeError("Function call result missing function_response")
-            
+                
             func_response = parts[0].function_response.response
             if func_response is None:
                 raise RuntimeError("Function call result missing report data")
-            
+                
             tool_responses.append(parts[0])
             if verbose:
                 print(f"-> {func_response}")
-                
-        if verbose:
-            print(response.text)
-            print(f"User prompt: {user_prompt}")
-            print(f"Prompt tokens: {prompt_tokens}")
-            print(f"Response tokens: {response_tokens}")
-    else:
-        if verbose:
-            print(response.text)
-            print(f"User prompt: {user_prompt}")
-            print(f"Prompt tokens: {prompt_tokens}")
-            print(f"Response tokens: {response_tokens}")
-        else:
-            print(response.text)
+
+    # saving call_function data to messages
+    if tool_responses:
+        tool_message = types.Content(
+            role="user", 
+            parts=tool_responses,
+        )
+        messages.append(tool_message)
+
+    # checking if model is finished
+    has_function_call = False
+
+    for candidate in response.candidates:
+        for part in candidate.content.parts:
+            if part.function_call is not None:
+                has_function_call = True
+                break
+        if has_function_call:
+            break
+
+    # responses for user 
+    if verbose:
+        # token count
+        prompt_tokens = response.usage_metadata.prompt_token_count
+        response_tokens = response.usage_metadata.candidates_token_count
+
+        print(f"User prompt: {user_prompt}")                
+        print(f"Prompt tokens: {prompt_tokens}")
+        print(f"Response tokens: {response_tokens}")
+
+    # Model is finished if no function calls and has text response
+    if not has_function_call and response.text:
+        return response.text
+
+    if not has_function_call and not response.text:
+        return None    
+    
+    return None
 
 def main():
     # getting API key
@@ -102,7 +127,19 @@ def main():
                 types.Content(role="user", parts=[types.Part(text=user_prompt)]),
             ]
     
-    generate_response(client, messages, verbose, user_prompt)
+    for i in range(20):
+        try:
+            final_text = generate_response(client, messages, verbose, user_prompt)
+            if final_text:
+                print("Final response:")
+                print(final_text)
+                break
+        except Exception as e:
+            print(f"Error in generating response: {e}")
+            break
+    else:
+        print("Maximum iterations (20) reached")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
